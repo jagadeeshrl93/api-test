@@ -5,7 +5,7 @@ pipeline {
         DOCKER_IMAGE = "jagadeesh916/api-test"
         CONTAINER_NAME = "api-test"
         EC2_HOST = "3.142.97.193"
-        EC2_USER = "i-0bb13bc38890414ad"
+        EC2_USER = "ubuntu"
     }
 
     stages {
