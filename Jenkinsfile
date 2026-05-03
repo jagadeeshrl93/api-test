@@ -16,12 +16,6 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t $DOCKER_IMAGE:latest .'
-            }
-        }
-
         stage('Login to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
@@ -29,20 +23,29 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    '''
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Build and Push Docker Image for EC2') {
             steps {
-                sh 'docker push $DOCKER_IMAGE:latest'
+                sh '''
+                docker buildx create --use || true
+
+                docker buildx build \
+                  --platform linux/amd64 \
+                  -t $DOCKER_IMAGE:latest \
+                  --push .
+                '''
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['Ec2']) {
+                sshagent(['EC2']) {
                     sh '''
                     ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "
                         docker pull $DOCKER_IMAGE:latest &&
@@ -57,6 +60,16 @@ pipeline {
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check console output.'
         }
     }
 }
