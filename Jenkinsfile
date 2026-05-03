@@ -20,7 +20,7 @@ pipeline {
 
         stage('Test Docker Image') {
             steps {
-                sh 'docker images | grep k8s-yaml-api'
+                sh 'docker images | grep api-test'
             }
         }
     }
