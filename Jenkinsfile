@@ -3,6 +3,9 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "jagadeesh916/api-test"
+        CONTAINER_NAME = "api-test"
+        EC2_HOST = "3.142.97.193"
+        EC2_USER = "i-0bb13bc38890414ad"
     }
 
     stages {
@@ -19,12 +22,6 @@ pipeline {
             }
         }
 
-        stage('Test Docker Image') {
-            steps {
-                sh 'docker images | grep api-test'
-            }
-        }
-
         stage('Login to Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
@@ -32,9 +29,7 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
-                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                    '''
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
             }
         }
@@ -42,6 +37,25 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 sh 'docker push $DOCKER_IMAGE:latest'
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "
+                        docker pull $DOCKER_IMAGE:latest &&
+                        docker stop $CONTAINER_NAME || true &&
+                        docker rm $CONTAINER_NAME || true &&
+                        docker run -d \
+                          --name $CONTAINER_NAME \
+                          -p 8000:8000 \
+                          --restart always \
+                          $DOCKER_IMAGE:latest
+                    "
+                    '''
+                }
             }
         }
     }
